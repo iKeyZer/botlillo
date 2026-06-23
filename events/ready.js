@@ -5,10 +5,9 @@ const logger = require('../utils/logger');
 
 const activities = [
   { name: '/sugerencia — Envía tu idea', type: ActivityType.Watching },
-  { name: '/sorteo — Crea un sorteo', type: ActivityType.Watching },
   { name: '/cumpleaños — Registra tu fecha', type: ActivityType.Watching },
-  { name: '/listacumpleanos — Ver cumpleaños', type: ActivityType.Watching },
-  { name: '/versorteos — Gestiona sorteos', type: ActivityType.Watching },
+  { name: '/miscumpleanos — Ve tu cumpleaños', type: ActivityType.Watching },
+  { name: '/listacumpleanos — Cumpleaños del mes', type: ActivityType.Watching },
 ];
 
 function setRotatingActivity(client) {
