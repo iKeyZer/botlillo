@@ -40,12 +40,14 @@ module.exports = {
 
     const buildRows = (p) => {
       const navRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('sug_prev').setLabel('◀ Anterior').setStyle(ButtonStyle.Secondary).setDisabled(p === 0),
-        new ButtonBuilder().setCustomId('sug_next').setLabel('Siguiente ▶').setStyle(ButtonStyle.Secondary).setDisabled(p === suggestions.length - 1),
+        new ButtonBuilder().setCustomId('sug_prev').setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(p === 0),
+        new ButtonBuilder().setCustomId('sug_next').setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(p === suggestions.length - 1),
       );
       const actionRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('sug_aprobar').setLabel('✅ Aprobar').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('sug_rechazar').setLabel('❌ Rechazar').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('sug_eliminar').setLabel('🗑️ Eliminar').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('sug_cerrar_debate').setLabel('🔒 Cerrar Debate').setStyle(ButtonStyle.Secondary),
       );
       return [navRow, actionRow];
     };
@@ -90,8 +92,45 @@ module.exports = {
                 .setMaxLength(500)
             )
           );
+        return btn.showModal(modal);
+      }
 
-        await btn.showModal(modal);
+      if (btn.customId === 'sug_eliminar') {
+        const s = suggestions[page];
+
+        // Eliminar mensaje de Discord si existe
+        const channel = btn.guild.channels.cache.get(s.channelId);
+        const msg = await channel?.messages.fetch(s.messageId).catch(() => null);
+        if (msg) await msg.delete().catch(() => null);
+
+        await Suggestion.findByIdAndDelete(s._id);
+        suggestions.splice(page, 1);
+
+        if (!suggestions.length) {
+          return btn.update({ content: '✅ No quedan más sugerencias pendientes.', embeds: [], components: [] });
+        }
+
+        if (page >= suggestions.length) page = suggestions.length - 1;
+        return btn.update({ embeds: [buildEmbed(page)], components: buildRows(page) });
+      }
+
+      if (btn.customId === 'sug_cerrar_debate') {
+        const s = suggestions[page];
+        const channel = btn.guild.channels.cache.get(s.channelId);
+        const msg = await channel?.messages.fetch(s.messageId).catch(() => null);
+
+        const thread = msg?.thread ?? null;
+        if (!thread || thread.archived) {
+          return btn.reply({ content: '❌ No hay un hilo de debate activo para esta sugerencia.', ephemeral: true });
+        }
+
+        const { stopTimer } = require('../../utils/threadManager');
+        stopTimer(thread.id);
+        await thread.send('🔒 Debate cerrado manualmente por un administrador.');
+        await thread.setLocked(true);
+        await thread.setArchived(true);
+
+        return btn.reply({ content: '✅ Hilo de debate cerrado.', ephemeral: true });
       }
     });
 
