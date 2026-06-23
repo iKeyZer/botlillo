@@ -26,7 +26,7 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setTitle(`🎉 SORTEO: ${prize}`)
-      .setDescription(`Reacciona con 🎉 para participar!\n\n**Ganadores:** ${winnerCount}\n**Termina:** <t:${Math.floor(endAt.getTime() / 1000)}:R>\n**Organizado por:** <@${interaction.user.id}>`)
+      .setDescription(`Reacciona con 🎉 para participar!\n\n**Participantes:** ${winnerCount}\n**Termina:** <t:${Math.floor(endAt.getTime() / 1000)}:R>\n**Organizado por:** <@${interaction.user.id}>`)
       .setColor(0xf5a623)
       .setFooter({ text: `Duración: ${formatDuration(duration)}` })
       .setTimestamp(endAt);
