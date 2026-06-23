@@ -4,7 +4,7 @@
   "description": "Bot de Discord con sistema de sugerencias y cumpleaños",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node utils/deployCommands.js && node index.js",
     "deploy": "node utils/deployCommands.js"
   },
   "dependencies": {
