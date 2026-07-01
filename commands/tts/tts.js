@@ -45,8 +45,16 @@ module.exports = {
     const texto = interaction.options.getString('texto');
     await interaction.reply(`🔊 <@${interaction.user.id}> dice: **${texto}**`);
 
-    // Reutilizar conexión existente o crear una nueva
+    // Verificar si el bot ya está en otro canal
     let connection = getVoiceConnection(interaction.guild.id);
+    if (connection && connection.joinConfig.channelId !== voiceChannel.id) {
+      const otherChannel = interaction.guild.channels.cache.get(connection.joinConfig.channelId);
+      return interaction.reply({
+        content: `❌ El bot ya está siendo usado en ${otherChannel ? `**${otherChannel.name}**` : 'otro canal de voz'}. Espera a que quede libre.`,
+        ephemeral: true,
+      });
+    }
+
     if (!connection) {
       connection = joinVoiceChannel({
         channelId: voiceChannel.id,
