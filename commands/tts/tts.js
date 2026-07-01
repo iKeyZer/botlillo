@@ -5,6 +5,7 @@ const {
   createAudioResource,
   AudioPlayerStatus,
   getVoiceConnection,
+  VoiceConnectionStatus,
 } = require('@discordjs/voice');
 const gTTS = require('gtts');
 const { randomUUID } = require('crypto');
@@ -17,7 +18,6 @@ process.env.FFMPEG_PATH = ffmpegPath;
 const TEMP_DIR = path.join(__dirname, '..', '..', 'temp');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR);
 
-// Un solo player por guild para evitar solapamiento
 const players = new Map();
 
 module.exports = {
@@ -43,7 +43,6 @@ module.exports = {
     }
 
     const texto = interaction.options.getString('texto');
-    await interaction.reply(`🔊 <@${interaction.user.id}> dice: **${texto}**`);
 
     // Verificar si el bot ya está en otro canal
     let connection = getVoiceConnection(interaction.guild.id);
@@ -55,21 +54,31 @@ module.exports = {
       });
     }
 
+    // Crear nueva conexión si no existe
     if (!connection) {
       connection = joinVoiceChannel({
         channelId: voiceChannel.id,
         guildId: interaction.guild.id,
         adapterCreator: interaction.guild.voiceAdapterCreator,
       });
+
+      // Limpiar player al desconectar para que se cree uno nuevo la próxima vez
+      connection.on(VoiceConnectionStatus.Destroyed, () => {
+        players.delete(interaction.guild.id);
+      });
     }
 
-    // Reutilizar o crear player para este servidor
+    // Crear player fresco si no existe o si la conexión es nueva
     if (!players.has(interaction.guild.id)) {
-      players.set(interaction.guild.id, createAudioPlayer());
-      connection.subscribe(players.get(interaction.guild.id));
+      const player = createAudioPlayer();
+      players.set(interaction.guild.id, player);
+      connection.subscribe(player);
     }
 
     const player = players.get(interaction.guild.id);
+
+    await interaction.reply(`🔊 <@${interaction.user.id}> dice: **${texto}**`);
+
     const tmpFile = path.join(TEMP_DIR, `${randomUUID()}.mp3`);
     const tts = new gTTS(texto, 'es');
 
@@ -82,7 +91,6 @@ module.exports = {
       const resource = createAudioResource(tmpFile);
       player.play(resource);
 
-      // Solo eliminar el archivo temporal al terminar, no desconectar
       player.once(AudioPlayerStatus.Idle, () => {
         fs.unlink(tmpFile, () => null);
       });
