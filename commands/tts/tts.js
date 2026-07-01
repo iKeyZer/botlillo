@@ -4,6 +4,7 @@ const {
   createAudioPlayer,
   createAudioResource,
   AudioPlayerStatus,
+  getVoiceConnection,
 } = require('@discordjs/voice');
 const gTTS = require('gtts');
 const { randomUUID } = require('crypto');
@@ -15,6 +16,9 @@ process.env.FFMPEG_PATH = ffmpegPath;
 
 const TEMP_DIR = path.join(__dirname, '..', '..', 'temp');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR);
+
+// Un solo player por guild para evitar solapamiento
+const players = new Map();
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -41,6 +45,23 @@ module.exports = {
     const texto = interaction.options.getString('texto');
     await interaction.reply(`🔊 <@${interaction.user.id}> dice: **${texto}**`);
 
+    // Reutilizar conexión existente o crear una nueva
+    let connection = getVoiceConnection(interaction.guild.id);
+    if (!connection) {
+      connection = joinVoiceChannel({
+        channelId: voiceChannel.id,
+        guildId: interaction.guild.id,
+        adapterCreator: interaction.guild.voiceAdapterCreator,
+      });
+    }
+
+    // Reutilizar o crear player para este servidor
+    if (!players.has(interaction.guild.id)) {
+      players.set(interaction.guild.id, createAudioPlayer());
+      connection.subscribe(players.get(interaction.guild.id));
+    }
+
+    const player = players.get(interaction.guild.id);
     const tmpFile = path.join(TEMP_DIR, `${randomUUID()}.mp3`);
     const tts = new gTTS(texto, 'es');
 
@@ -50,25 +71,17 @@ module.exports = {
         return;
       }
 
-      const connection = joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId: interaction.guild.id,
-        adapterCreator: interaction.guild.voiceAdapterCreator,
-      });
-
-      const player = createAudioPlayer();
       const resource = createAudioResource(tmpFile);
-
-      connection.subscribe(player);
       player.play(resource);
 
-      const cleanup = () => {
-        connection.destroy();
+      // Solo eliminar el archivo temporal al terminar, no desconectar
+      player.once(AudioPlayerStatus.Idle, () => {
         fs.unlink(tmpFile, () => null);
-      };
+      });
 
-      player.on(AudioPlayerStatus.Idle, cleanup);
-      player.on('error', cleanup);
+      player.once('error', () => {
+        fs.unlink(tmpFile, () => null);
+      });
     });
   },
 };
